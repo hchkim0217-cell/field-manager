@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="현장관리">
+<meta name="theme-color" content="#111315">
+<title>⚡ 현장관리</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#111315;--surface:#1C1F23;--card:#252930;--border:#2E333C;
+  --accent:#FF6200;--adim:rgba(255,98,0,.12);
+  --green:#22C55E;--gdim:rgba(34,197,94,.12);
+  --blue:#3B82F6;--yellow:#EAB308;--ydim:rgba(234,179,8,.12);
+  --text:#E2E5EA;--muted:#6C7580;--muted2:#9AA3AF;--danger:#EF4444;
+  --nav:60px;--safe:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;}
+#root{height:100%;display:flex;flex-direction:column;}
+
+/* ── Header ── */
+.hdr{background:var(--surface);border-bottom:2px solid var(--accent);padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.hlogo{font-size:18px;font-weight:900;color:var(--accent);letter-spacing:1px;}
+.hsub{font-size:10px;color:var(--muted2);margin-top:1px;}
+.hbadges{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.hbadge{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;background:var(--adim);border:1px solid var(--accent);color:var(--accent);}
+.hbadge.g{background:var(--gdim);border-color:var(--green);color:var(--green);}
+
+/* ── Est banner ── */
+.estbar{background:var(--gdim);border-bottom:1px solid var(--green);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;}
+.estbar strong{color:var(--green);font-size:12px;}
+.estbar span{font-size:11px;color:var(--muted2);}
+
+/* ── Content ── */
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px;padding-bottom:calc(var(--nav) + var(--safe) + 16px);}
+
+/* ── Bottom Nav ── */
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe);z-index:100;height:calc(var(--nav) + var(--safe));}
+.navBtn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:none;background:none;color:var(--muted2);font-family:'Noto Sans KR';font-size:10px;font-weight:500;cursor:pointer;padding:8px 4px;transition:color .15s;-webkit-tap-highlight-color:transparent;}
+.navBtn.on{color:var(--accent);}
+.navBtn .icon{font-size:20px;line-height:1;}
+.navBtn .sendBtn{background:var(--accent);color:#fff;border-radius:14px;padding:4px 10px;font-size:12px;font-weight:700;}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;}
+.stitle{font-size:13px;font-weight:900;color:var(--accent);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.ssub{font-size:11px;color:var(--muted2);font-weight:400;margin-left:6px;}
+
+/* ── Stats ── */
+.statg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.statc{background:var(--card);border:1px solid var(--border);border-top:2px solid var(--accent);border-radius:10px;padding:14px;text-align:center;}
+.statv{font-size:22px;font-weight:900;color:var(--accent);display:block;line-height:1.1;}
+.statl{font-size:10px;color:var(--muted2);margin-top:3px;}
+
+/* ── Forms ── */
+.fgrp{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.flbl{font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;}
+.finput,.fsel,.ftxt{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Noto Sans KR';font-size:16px;padding:12px 14px;width:100%;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none;}
+.finput:focus,.fsel:focus,.ftxt:focus{border-color:var(--accent);}
+.ftxt{resize:none;min-height:80px;}
+.frow{display:flex;}
+.frow .finput{border-radius:8px 0 0 8px;flex:1;}
+.frow .fsel{border-radius:0 8px 8px 0;border-left:none;width:72px;}
+.fcalc{font-size:11px;color:var(--accent);margin-top:4px;}
+.fgrid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* ── Buttons ── */
+.btn{padding:12px 18px;border:none;border-radius:8px;font-family:'Noto Sans KR';font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:opacity .15s;touch-action:manipulation;}
+.btn:active{opacity:.75;}
+.btnP{background:var(--accent);color:#fff;}
+.btnG{background:transparent;border:1px solid var(--border);color:var(--muted2);}
+.btnGr{background:var(--green);color:#000;}
+.btnD{background:transparent;border:1px solid var(--danger);color:var(--danger);padding:8px 12px;font-size:12px;}
+.btnFull{width:100%;padding:14px;}
+.btnSm{padding:8px 12px;font-size:12px;}
+
+/* ── Info box ── */
+.infoBox{background:var(--adim);border-left:3px solid var(--accent);border-radius:4px;padding:10px 12px;font-size:12px;color:var(--muted2);margin-bottom:12px;line-height:1.7;}
+.infoBox strong{color:var(--text);}
+.greenBox{background:var(--gdim);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.8;}
+.greenBox .gt{font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;}
+
+/* ── Mode toggle ── */
+.toggle{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:14px;}
+.toggleBtn{flex:1;padding:10px;text-align:center;border:none;border-radius:6px;font-family:'Noto Sans KR';font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted2);transition:all .2s;}
+.toggleBtn.on{background:var(--accent);color:#fff;}
+
+/* ── Team chips ── */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;}
+.chip{padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid transparent;white-space:nowrap;flex-shrink:0;touch-action:manipulation;}
+
+/* ── Worker cards (pool) ── */
+.wgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.wcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s;position:relative;touch-action:manipulation;}
+.wcard:active{opacity:.8;}
+.wcard.sel{border-color:var(--green);background:var(--gdim);}
+.wcard.sel::after{content:'✓';position:absolute;top:10px;right:12px;color:var(--green);font-weight:900;font-size:16px;}
+.wname{font-size:14px;font-weight:700;margin-bottom:3px;padding-right:20px;}
+.wrole{font-size:11px;color:var(--muted2);}
+.wtel{font-size:11px;color:var(--muted);margin-top:3px;}
+.wtag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-top:6px;}
+
+/* ── Selection summary ── */
+.selbar{background:var(--gdim);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.selcnt{font-size:18px;font-weight:900;color:var(--green);}
+.selnm{font-size:11px;color:var(--muted2);margin-top:2px;}
+
+/* ── DB rows ── */
+.dbrow{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.dbbar{width:5px;height:40px;border-radius:3px;flex-shrink:0;}
+.dbinfo{flex:1;min-width:0;}
+.dbname{font-size:14px;font-weight:700;}
+.dbmeta{font-size:11px;color:var(--muted2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dbact{display:flex;gap:6px;flex-shrink:0;}
+
+/* ── Team rows ── */
+.teamrow{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.tdot{width:14px;height:14px;border-radius:50%;flex-shrink:0;}
+.tname{flex:1;font-size:14px;font-weight:700;}
+.tcnt{font-size:12px;color:var(--muted2);}
+
+/* ── Send tab ── */
+.wtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.wtab{padding:10px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted2);font-size:13px;font-weight:500;cursor:pointer;touch-action:manipulation;}
+.wtab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+.kakao{background:#FEF9C3;border:2px solid #FDE68A;border-radius:10px;padding:16px;color:#1a1a1a;font-size:12px;line-height:1.9;white-space:pre-wrap;max-height:380px;overflow-y:auto;font-family:'Noto Sans KR',monospace;}
+
+/* ── Materials table ── */
+.mtbl{width:100%;border-collapse:collapse;font-size:12px;}
+.mtbl th{background:var(--surface);color:var(--muted2);font-size:10px;text-transform:uppercase;padding:8px;text-align:left;border-bottom:1px solid var(--border);}
+.mtbl td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.catbadge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;}
+.cmat{background:var(--adim);color:var(--accent);}
+.clab{background:rgba(59,130,246,.12);color:var(--blue);}
+.ceqp{background:var(--ydim);color:var(--yellow);}
+.qv{font-size:15px;font-weight:900;color:var(--accent);}
+.ttlrow{background:var(--adim);border-radius:6px;padding:12px 14px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;}
+.ttllbl{font-size:12px;font-weight:700;color:var(--muted2);}
+.ttlval{font-size:20px;font-weight:900;color:var(--accent);}
+
+/* ── Calc table ── */
+.ptbl{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;}
+.ptbl th{background:var(--surface);color:var(--muted2);font-size:10px;padding:7px 6px;text-align:left;border-bottom:1px solid var(--border);}
+.ptbl td{padding:6px 4px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.ptbl .fi{padding:6px 8px;font-size:12px;min-width:0;}
+.cbadge{background:var(--adim);border:1px solid var(--accent);color:var(--accent);padding:3px 8px;border-radius:4px;font-size:13px;font-weight:900;white-space:nowrap;}
+
+/* ── Modal ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;}
+.modal{background:var(--card);border-radius:16px 16px 0 0;padding:20px 20px calc(20px + var(--safe));width:100%;max-height:80vh;overflow-y:auto;}
+.mtitle{font-size:16px;font-weight:900;color:var(--accent);margin-bottom:16px;}
+.mbtns{display:flex;gap:10px;margin-top:16px;}
+.colors{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+.copt{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all .15s;flex-shrink:0;}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:calc(var(--nav) + var(--safe) + 16px);left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;z-index:300;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:tup .3s ease;}
+@keyframes tup{from{opacity:0;transform:translateX(-50%) translateY(12px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:40px 20px;}
+.empty .ico{font-size:48px;margin-bottom:12px;}
+.empty .emsg{font-size:14px;font-weight:700;margin-bottom:6px;}
+.empty .esub{font-size:13px;color:var(--muted2);margin-bottom:20px;}
+
+/* ── Group header ── */
+.grpHdr{font-size:11px;font-weight:700;color:var(--muted2);margin:14px 0 8px;display:flex;align-items:center;gap:6px;}
+.grpDot{width:8px;height:8px;border-radius:50%;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<input type="file" id="fileInp" accept=".xlsx,.xls" style="display:none">
+
+<script>
+'use strict';
+// ─────────────────── CONSTANTS ───────────────────
+const COLORS=[
+  {id:'c1',hex:'#FF6200'},{id:'c2',hex:'#3B82F6'},{id:'c3',hex:'#22C55E'},
+  {id:'c4',hex:'#A855F7'},{id:'c5',hex:'#EAB308'},{id:'c6',hex:'#EF4444'},
+  {id:'c7',hex:'#06B6D4'},{id:'c8',hex:'#EC4899'},
+];
+const ROLES=['현장 작업자','조장','반장','기능공','보조'];
+const METHODS=['에폭시','방수','도장'];
+const PHOTOS=['착공 전 현장 전경','바닥 면처리(그라인딩) 후','하도/프라이머 도포 중','하도 건조 후 상태','중도/방수층 도포 중','상도/마감 도포 완료','완공 후 전경 및 세부 마감'];
+const PROC_TPL={
+  '에폭시':[
+    {id:1,step:'하도 (프라이머)',mat:'에폭시 프라이머',can:18,cov:.20,coats:1,dry:'4~6시간',note:'바닥 함수율 8% 이하 확인'},
+    {id:2,step:'중도 (베이스코트)',mat:'에폭시 중도재',can:18,cov:.40,coats:1,dry:'12~24시간',note:'핀홀/기포 주의'},
+    {id:3,step:'상도 (탑코트)',mat:'에폭시 상도재',can:18,cov:.25,coats:2,dry:'24시간 이상',note:'균일 도막 두께 유지'},
+  ],
+  '방수':[
+    {id:1,step:'바탕처리 (프라이머)',mat:'방수 프라이머',can:18,cov:.25,coats:1,dry:'2~4시간',note:'크랙 보수 후 시공, 건조 필수'},
+    {id:2,step:'방수층 시공',mat:'방수재 (주제)',can:18,cov:.50,coats:2,dry:'24시간',note:'도막 두께 2mm 이상, 핀홀 검사'},
+    {id:3,step:'보호층 (탑코트)',mat:'보호 코팅재',can:18,cov:.30,coats:1,dry:'24시간 이상',note:'자외선 차단 코팅 균일 도포'},
+  ],
+  '도장':[
+    {id:1,step:'하도 (프라이머)',mat:'도장 프라이머',can:18,cov:.15,coats:1,dry:'2~4시간',note:'표면 연마 후 분진 제거'},
+    {id:2,step:'중도 (하이빌드)',mat:'하이빌드 도료',can:18,cov:.30,coats:2,dry:'8~12시간',note:'도막 두께 균일 유지'},
+    {id:3,step:'상도 (마감도장)',mat:'마감 도료',can:18,cov:.20,coats:2,dry:'24시간 이상',note:'색상 균일성 확인'},
+  ],
+};
+
+// ─────────────────── UTILS ───────────────────
+const uid=()=>Math.random().toString(36).slice(2,9);
+const fmt=n=>Number(n).toLocaleString('ko-KR');
+const fmtW=n=>`${fmt(Math.round(n))}원`;
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const getColor=id=>COLORS.find(c=>c.id===id)?.hex||'#6C7580';
+const detMethod=s=>{ if(!s)return '에폭시'; if(s.includes('방수'))return '방수'; if(s.includes('에폭시'))return '에폭시'; if(s.includes('도장'))return '도장'; return '에폭시'; };
+
+// ─────────────────── STATE ───────────────────
+const S={
+  tab:'project',
+  wIdx:0,
+  proj:{name:'',address:'',date:'',method:'방수',area:'',unit:'㎡',lossRate:15,supervisor:'',supervisorTel:'',notes:''},
+  workerDB:[],
+  teams:[],
+  selIds:new Set(),
+  assignMode:'pool',
+  manualWorkers:[{id:uid(),name:'',role:'현장 작업자',contact:''}],
+  filterTeam:'all',
+  processes:JSON.parse(JSON.stringify(PROC_TPL['방수'])),
+  estData:null,
+  modal:null, // {type:'worker'|'team', data:obj|null, form:{}}
+  toastTimer:null,
+};
+
+// ─────────────────── STORAGE ───────────────────
+function loadDB(){
+  try{
+    const w=localStorage.getItem('fm_workers');
+    const t=localStorage.getItem('fm_teams');
+    if(w) S.workerDB=JSON.parse(w);
+    if(t) S.teams=JSON.parse(t);
+  }catch(e){}
+}
+function saveWorkers(){ try{localStorage.setItem('fm_workers',JSON.stringify(S.workerDB));}catch(e){} }
+function saveTeams(){ try{localStorage.setItem('fm_teams',JSON.stringify(S.teams));}catch(e){} }
+
+// ─────────────────── COMPUTE ───────────────────
+function getSqm(){
+  const a=parseFloat(S.proj.area)||0;
+  return S.proj.unit==='평'?+(a*3.3).toFixed(1):+a.toFixed(1);
+}
+function calcKg(p){ return getSqm()*p.cov*p.coats*(1+S.proj.lossRate/100); }
+function calcCans(p){ return Math.ceil(calcKg(p)/p.can); }
+function totalCans(){ return S.processes.reduce((s,p)=>s+calcCans(p),0); }
+function getProjWorkers(){
+  return S.assignMode==='pool'
+    ? S.workerDB.filter(w=>S.selIds.has(w.id))
+    : S.manualWorkers.filter(w=>w.name.trim());
+}
+function getTeam(tid){ return S.teams.find(t=>t.id===tid); }
+
+// ─────────────────── TOAST ───────────────────
+function showToast(msg){
+  if(S.toastTimer) clearTimeout(S.toastTimer);
+  let t=document.querySelector('.toast');
+  if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t);}
+  t.textContent=msg;t.style.display='block';
+  S.toastTimer=setTimeout(()=>{if(t)t.style.display='none';},2500);
+}
+
+// ─────────────────── ESTIMATE PARSER ───────────────────
+function parseEst(wb){
+  const info={name:'',date:'',amount:0,method:'',areaSqm:0};
+  const mats=[],labor=[],equip=[];
+  const g=wb.Sheets['갑지'];
+  if(g){
+    const rows=XLSX.utils.sheet_to_json(g,{header:1,defval:null});
+    for(const row of rows){
+      if(!row)continue;
+      for(let ci=0;ci<row.length;ci++){
+        const cell=String(row[ci]??'');
+        if(cell.includes('工 事 名')||cell.includes('工事名')){const i=cell.indexOf(':');if(i>=0)info.name=cell.slice(i+1).trim();}
+        const dm=cell.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+        if(dm)info.date=`${dm[1]}-${dm[2].padStart(2,'0')}-${dm[3].padStart(2,'0')}`;
+        if(typeof row[ci]==='number'&&row[ci]>100000&&String(row[0]??'').includes('금액'))info.amount=Math.max(info.amount,row[ci]);
+      }
+    }
+  }
+  for(const sh of wb.SheetNames){
+    if(sh==='갑지'||sh.includes('수량'))continue;
+    const ws=wb.Sheets[sh];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    if(!rows.length)continue;
+    if(rows[0]?.[0])info.method=String(rows[0][0]).replace(/^\d+-\d+안\.\s*/,'').trim();
+    if(rows[1]){for(let ci=7;ci<(rows[1].length??0);ci++){if(typeof rows[1][ci]==='number'&&rows[1][ci]>10&&rows[1][ci]<100000){info.areaSqm=rows[1][ci];break;}}}
+    const SKIP=['소    계','소계','합계','직접공사비','간접공사비','절사','부가가치세','총      계','총계'];
+    let cat='재료비';
+    for(const row of rows){
+      if(!row)continue;
+      const c0=String(row[0]??'').trim();
+      if(c0.includes('간접공사비')||c0.includes('2.간접'))break;
+      if(c0.includes('(1)')&&c0.includes('재료비')){cat='재료비';continue;}
+      if(c0.includes('(2)')&&c0.includes('인건비')){cat='인건비';continue;}
+      if(c0.includes('(3)')){cat='장비대';continue;}
+      if(SKIP.some(s=>c0.includes(s))||!c0)continue;
+      const unit=String(row[2]??'').trim(),qty=row[3],price=row[4],amount=row[5];
+      if(c0&&unit&&typeof qty==='number'){
+        const it={name:c0.trim(),spec:String(row[1]??'').trim(),unit,qty,qr:Math.ceil(qty),price:typeof price==='number'?price:0,amount:typeof amount==='number'?amount:0,notes:String(row[6]??'').trim()};
+        if(cat==='재료비')mats.push(it);
+        else if(cat==='인건비')labor.push(it);
+        else equip.push(it);
+      }
+    }
+  }
+  return{info,mats,labor,equip};
+}
+
+// ─────────────────── KAKAO GEN ───────────────────
+function genKakao(w){
+  const area=getSqm();
+  const LINE='━'.repeat(20);
+  const nums=['①','②','③','④','⑤','⑥'];
+  const est=S.estData;
+  let t=`📋 작업 지시서\n${LINE}\n`;
+  t+=`🏗️ 공사명: ${S.proj.name||est?.info?.name||'(미입력)'}\n`;
+  t+=`⚙️  공법: ${est?est.info.method:S.proj.method}\n`;
+  t+=`📍 현장: ${S.proj.address||'(미입력)'}\n`;
+  t+=`📅 작업일: ${S.proj.date||'미정'}\n`;
+  t+=`📐 면적: ${fmt(area||est?.info?.areaSqm||0)}㎡\n`;
+  const team=w.teamId?getTeam(w.teamId):null;
+  t+=`👷 담당: ${w.name||'(미입력)'} [${w.role}${team?` · ${team.name}`:''}]${w.contact?` · ${w.contact}`:''}\n`;
+  t+=`${LINE}\n\n【 공정별 작업 내용 】\n\n`;
+  S.processes.forEach((p,i)=>{
+    t+=`${nums[i]||`${i+1}.`} ${p.step}\n`;
+    if(!est){t+=`   자재: ${p.mat} (${p.can}kg/말)\n   소요량: ${calcKg(p).toFixed(1)}kg → 📦 ${calcCans(p)}말\n`;}
+    t+=`   경화 시간: ${p.dry}\n`;
+    if(p.note)t+=`   ⚠️ ${p.note}\n`;
+    t+='\n';
+  });
+  t+=`${LINE}\n`;
+  if(est){
+    t+=`【 자재 내역 (견적서 기준) 】\n`;
+    est.mats.filter(m=>m.qty>0).forEach(m=>{const qs=m.qty!==m.qr?`${m.qr}(원값 ${m.qty})`:String(m.qr);t+=`  • ${m.name}${m.spec?` (${m.spec})`:''}: ${qs} ${m.unit}\n`;});
+    const tot=est.mats.reduce((s,m)=>s+m.amount,0);
+    if(tot>0)t+=`  재료비: ${fmtW(tot)}\n`;
+  } else {
+    t+=`【 자재 합계 (자동계산) 】\n`;
+    S.processes.forEach(p=>{t+=`  • ${p.mat}: ${calcCans(p)}말\n`;});
+    t+=`  총 ${totalCans()}말\n`;
+  }
+  t+=`\n${LINE}\n【 📸 필수 사진 체크리스트 】\n`;
+  PHOTOS.forEach(ph=>{t+=`  ☐ ${ph}\n`;});
+  if(S.proj.supervisor||S.proj.supervisorTel){t+=`\n${LINE}\n`;if(S.proj.supervisor)t+=`📞 현장소장: ${S.proj.supervisor}\n`;if(S.proj.supervisorTel)t+=`☎️  연락처: ${S.proj.supervisorTel}\n`;}
+  if(S.proj.notes)t+=`\n💬 특이사항\n${S.proj.notes}\n`;
+  return t;
+}
+
+// ─────────────────── RENDER HTML ───────────────────
+function renderApp(){
+  const pw=getProjWorkers();
+  const area=getSqm();
+  const est=S.estData;
+  const TABS=[
+    {k:'project',icon:'📋',lbl:'프로젝트'},
+    {k:'workers',icon:'👷',lbl:`배정${pw.length>0?`(${pw.length})`:''}` },
+    {k:'pool',icon:'👥',lbl:`인력풀${S.workerDB.length>0?`(${S.workerDB.length})`:''}` },
+    {k:'materials',icon:est?'📦':'⚙️',lbl:'자재'},
+    {k:'send',icon:'📤',lbl:'발송'},
+  ];
+
+  return `
+  <div class="hdr">
+    <div>
+      <div class="hlogo">⚡ 현장관리</div>
+      <div class="hsub">도장 · 방수 · 에폭시</div>
+    </div>
+    <div class="hbadges">
+      <span class="hbadge">${esc(S.proj.method)}</span>
+      ${(area>0||est)?`<span class="hbadge">${fmt(area||est?.info?.areaSqm||0)}㎡</span>`:''}
+      ${est?`<span class="hbadge g">📄 견적서</span>`:''}
+      ${pw.length>0?`<span class="hbadge g">👷${pw.length}</span>`:''}
+    </div>
+  </div>
+  ${est?`<div class="estbar">
+    <strong>📄 견적서 연동</strong>
+    <span>${esc(est.info.method)}</span><span>·</span>
+    <span>${fmt(est.info.areaSqm)}㎡</span><span>·</span>
+    <span>${fmtW(est.info.amount)}</span>
+    <button class="btn btnD btnSm" style="margin-left:auto;padding:4px 10px;font-size:11px" data-action="clearEst">✕</button>
+  </div>`:''}
+  <div class="content" id="mainContent">
+    ${renderTab()}
+  </div>
+  <nav class="nav">
+    ${TABS.map(t=>`
+      <button class="navBtn${S.tab===t.k?' on':''}" data-action="tab" data-val="${t.k}">
+        <span class="icon">${t.icon}</span>${esc(t.lbl)}
+      </button>`).join('')}
+  </nav>
+  ${S.modal?renderModal():''}`;
+}
+
+// ─────────────────── TAB CONTENT ───────────────────
+function renderTab(){
+  if(S.tab==='project') return renderProject();
+  if(S.tab==='workers') return renderWorkers();
+  if(S.tab==='pool') return renderPool();
+  if(S.tab==='materials') return renderMaterials();
+  if(S.tab==='send') return renderSend();
+  return '';
+}
+
+function renderProject(){
+  const area=getSqm();
+  const est=S.estData;
+  const p=S.proj;
+  return `
+  ${(area>0||est)?`<div class="statg">
+    <div class="statc"><span class="statv">${fmt(area||est?.info?.areaSqm||0)}</span><div class="statl">시공 면적 (㎡)</div></div>
+    <div class="statc"><span class="statv">${getProjWorkers().length}</span><div class="statl">배정 작업자</div></div>
+    ${est?`<div class="statc"><span class="statv">${est.mats.length}</span><div class="statl">재료 항목</div></div>
+    <div class="statc"><span class="statv" style="font-size:14px;padding-top:4px">${fmtW(est.info.amount)}</span><div class="statl">공사 금액</div></div>`
+    :`<div class="statc"><span class="statv">${totalCans()}</span><div class="statl">총 발주(말)</div></div>`}
+  </div>`:''}
+
+  <div class="card">
+    <div class="stitle">📂 파일 불러오기</div>
+    <div class="infoBox"><strong>견적서 엑셀</strong>: 공사명·면적·자재 자동 추출<br><strong>현장데이터 엑셀</strong>: 기본 정보 일괄 입력</div>
+    <button class="btn btnP btnFull" data-action="openFile">📂 엑셀 불러오기 (견적서 / 템플릿)</button>
+  </div>
+
+  <div class="card">
+    <div class="stitle">🏗️ 현장 정보</div>
+    <div class="fgrp"><label class="flbl">공사명</label><input class="finput" data-bind="proj.name" value="${esc(p.name)}" placeholder="○○빌딩 방수공사"></div>
+    <div class="fgrp"><label class="flbl">공법</label>
+      <select class="fsel" data-bind="proj.method">
+        ${METHODS.map(m=>`<option value="${m}"${p.method===m?' selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fgrp"><label class="flbl">현장 주소</label><input class="finput" data-bind="proj.address" value="${esc(p.address)}" placeholder="서울시 ○○구 ○○동"></div>
+    <div class="fgrid2" style="gap:10px;margin-bottom:12px">
+      <div class="fgrp" style="margin:0"><label class="flbl">작업 시작일</label><input type="date" class="finput" data-bind="proj.date" value="${esc(p.date)}"></div>
+      <div class="fgrp" style="margin:0"><label class="flbl">로스율 (%)</label><input type="number" class="finput" data-bind="proj.lossRate" value="${p.lossRate}"></div>
+    </div>
+    <div class="fgrp"><label class="flbl">시공 면적</label>
+      <div class="frow">
+        <input type="number" class="finput" data-bind="proj.area" value="${esc(p.area)}" placeholder="160.5">
+        <select class="fsel" data-bind="proj.unit" style="width:72px">
+          <option value="㎡"${p.unit==='㎡'?' selected':''}>㎡</option>
+          <option value="평"${p.unit==='평'?' selected':''}>평</option>
+        </select>
+      </div>
+      ${p.unit==='평'&&p.area?`<div class="fcalc">→ ${(parseFloat(p.area)*3.3).toFixed(1)}㎡</div>`:''}
+    </div>
+    <div class="fgrid2" style="gap:10px;margin-bottom:12px">
+      <div class="fgrp" style="margin:0"><label class="flbl">현장 소장</label><input class="finput" data-bind="proj.supervisor" value="${esc(p.supervisor)}" placeholder="홍길동"></div>
+      <div class="fgrp" style="margin:0"><label class="flbl">소장 연락처</label><input class="finput" data-bind="proj.supervisorTel" value="${esc(p.supervisorTel)}" placeholder="010-0000-0000"></div>
+    </div>
+    <div class="fgrp"><label class="flbl">특이사항</label><textarea class="ftxt" data-bind="proj.notes" placeholder="추가 지시사항...">${esc(p.notes)}</textarea></div>
+  </div>`;
+}
+
+function renderWorkers(){
+  const db=S.workerDB;
+  return `
+  <div class="toggle">
+    <button class="toggleBtn${S.assignMode==='pool'?' on':''}" data-action="setMode" data-val="pool">👥 인력풀에서 선택${db.length>0?` (${db.length}명)`:''}</button>
+    <button class="toggleBtn${S.assignMode==='manual'?' on':''}" data-action="setMode" data-val="manual">✏️ 직접 입력</button>
+  </div>
+  ${S.assignMode==='pool'?renderPoolSelect():renderManual()}`;
+}
+
+function renderPoolSelect(){
+  const db=S.workerDB;
+  if(db.length===0) return `
+    <div class="empty">
+      <div class="ico">👥</div>
+      <div class="emsg">인력풀이 비어있습니다</div>
+      <div class="esub">「인력풀」탭에서 작업자를 먼저 등록하세요</div>
+      <button class="btn btnP" data-action="tab" data-val="pool">👥 인력풀 관리로 이동 →</button>
+    </div>`;
+  
+  const filtered=S.filterTeam==='all'?db:db.filter(w=>w.teamId===S.filterTeam);
+  const sel=S.selIds;
+  
+  return `
+  <div class="chips">
+    <div class="chip${S.filterTeam==='all'?' active':''}" style="background:${S.filterTeam==='all'?'var(--accent)':'var(--surface)'};color:${S.filterTeam==='all'?'#fff':'var(--muted2)'};border-color:${S.filterTeam==='all'?'var(--accent)':'var(--border)'}" data-action="filterTeam" data-val="all">전체 (${db.length}명)</div>
+    ${S.teams.map(t=>{const color=getColor(t.colorId);const cnt=db.filter(w=>w.teamId===t.id).length;const on=S.filterTeam===t.id;return `<div class="chip${on?' active':''}" style="color:${color};background:${on?color+'20':'var(--surface)'};border-color:${on?color:'var(--border)'}" data-action="filterTeam" data-val="${t.id}">${esc(t.name)} (${cnt}명)</div>`;}).join('')}
+  </div>
+  ${S.filterTeam!=='all'&&S.teams.find(t=>t.id===S.filterTeam)?`<button class="btn btnSm" style="margin-bottom:12px;background:${getColor(S.teams.find(t=>t.id===S.filterTeam)?.colorId)};color:#fff;border:none" data-action="selectTeam" data-val="${S.filterTeam}">팀 전체 선택</button>`:''}
+  ${sel.size>0?`<div class="selbar">
+    <div><div class="selcnt">${sel.size}명 선택됨</div><div class="selnm">${db.filter(w=>sel.has(w.id)).map(w=>w.name).join(', ')}</div></div>
+    <button class="btn btnD btnSm" data-action="clearSel">초기화</button>
+  </div>`:''}
+  <div class="wgrid">
+    ${filtered.map(w=>{
+      const team=w.teamId?getTeam(w.teamId):null;
+      const color=getColor(w.teamId);
+      const s=sel.has(w.id);
+      return `<div class="wcard${s?' sel':''}" data-action="toggleSel" data-val="${w.id}">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></div>
+          <div class="wname">${esc(w.name)}</div>
+        </div>
+        <div class="wrole">${esc(w.role)}</div>
+        ${w.contact?`<div class="wtel">📱 ${esc(w.contact)}</div>`:''}
+        ${team?`<div class="wtag" style="background:${color}20;color:${color}">${esc(team.name)}</div>`:''}
+      </div>`;
+    }).join('')}
+  </div>
+  ${filtered.length===0?`<div style="text-align:center;color:var(--muted2);padding:20px;font-size:13px">해당 팀에 소속된 작업자가 없습니다</div>`:''}
+  ${sel.size===0?`<div style="text-align:center;color:var(--muted2);padding:12px;font-size:13px">카드를 탭해서 이번 현장 작업자를 선택하세요</div>`:''}`;
+}
+
+function renderManual(){
+  return `
+  <div class="infoBox">직접 입력 후 <strong>「인력풀에 저장」</strong>을 누르면 다음에 선택 방식으로 쓸 수 있어요.</div>
+  ${S.manualWorkers.map((w,i)=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:18px;font-weight:900;color:var(--accent);opacity:.3">0${i+1}</div>
+        ${S.manualWorkers.length>1?`<button class="btn btnD btnSm" data-action="delManual" data-val="${w.id}">🗑️</button>`:''}
+      </div>
+      <div class="fgrp"><label class="flbl">이름</label><input class="finput" data-manualid="${w.id}" data-field="name" value="${esc(w.name)}" placeholder="홍길동"></div>
+      <div class="fgrp"><label class="flbl">역할</label>
+        <select class="fsel" data-manualid="${w.id}" data-field="role">
+          ${ROLES.map(r=>`<option${w.role===r?' selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fgrp"><label class="flbl">연락처</label><input class="finput" data-manualid="${w.id}" data-field="contact" value="${esc(w.contact)}" placeholder="010-1234-5678"></div>
+      ${w.name?`<button class="btn btnG btnSm" style="margin-top:8px" data-action="saveToPool" data-val="${w.id}">💾 인력풀에 저장</button>`:''}
+    </div>`).join('')}
+  <button class="btn btnG btnFull" data-action="addManual">＋ 작업자 추가</button>`;
+}
+
+function renderPool(){
+  const db=S.workerDB;
+  return `
+  <div class="card">
+    <div class="stitle">🏷️ 팀 관리</div>
+    ${S.teams.length===0?`<div style="color:var(--muted2);font-size:13px;margin-bottom:12px">팀이 없습니다. 추가하면 작업자를 그룹화할 수 있어요.</div>`:''}
+    ${S.teams.map(t=>{const color=getColor(t.colorId);const cnt=db.filter(w=>w.teamId===t.id).length;return `
+      <div class="teamrow">
+        <div class="tdot" style="background:${color}"></div>
+        <div class="tname">${esc(t.name)}</div>
+        <div class="tcnt">${cnt}명</div>
+        <div class="dbact">
+          <button class="btn btnG btnSm" data-action="editTeam" data-val="${t.id}">✏️</button>
+          <button class="btn btnD" data-action="delTeam" data-val="${t.id}">🗑️</button>
+        </div>
+      </div>`;}).join('')}
+    <button class="btn btnG" style="margin-top:6px" data-action="addTeam">＋ 팀 추가</button>
+  </div>
+
+  <div class="card">
+    <div class="stitle">👥 전체 인력풀 <span class="ssub">총 ${db.length}명 · 영구 저장</span></div>
+    ${db.length===0?`<div class="empty" style="padding:20px 0">
+      <div class="ico" style="font-size:36px">👷</div>
+      <div class="emsg">작업자가 없습니다</div>
+      <div class="esub">아래 버튼으로 추가하거나,<br>배정 탭의 직접입력에서 「인력풀에 저장」을 누르세요</div>
+    </div>`:''}
+    ${[...S.teams.map(t=>({...t,isTeam:true})),{id:'',name:'팀 미지정',isTeam:false}].map(grp=>{
+      const members=db.filter(w=>grp.id?w.teamId===grp.id:!w.teamId||!S.teams.find(t=>t.id===w.teamId));
+      if(!members.length)return '';
+      const color=grp.id?getColor(grp.colorId):'var(--muted)';
+      return `<div class="grpHdr">${grp.id?`<div class="grpDot" style="background:${color}"></div>`:''}<span>${esc(grp.name)} (${members.length}명)</span></div>
+      ${members.map(w=>`
+        <div class="dbrow">
+          <div class="dbbar" style="background:${getColor(w.teamId)}"></div>
+          <div class="dbinfo">
+            <div class="dbname">${esc(w.name)} <span style="font-size:12px;color:var(--muted2);font-weight:400">${esc(w.role)}</span></div>
+            <div class="dbmeta">${esc(w.contact||'연락처 없음')}${w.memo?` · ${esc(w.memo)}`:''}</div>
+          </div>
+          <div class="dbact">
+            <button class="btn btnG btnSm" data-action="editWorker" data-val="${w.id}">✏️</button>
+            <button class="btn btnD" data-action="delWorker" data-val="${w.id}">🗑️</button>
+          </div>
+        </div>`).join('')}`;
+    }).join('')}
+    <button class="btn btnP" style="margin-top:10px;width:100%" data-action="addWorker">＋ 새 작업자 등록</button>
+  </div>`;
+}
+
+function renderMaterials(){
+  const est=S.estData;
+  if(est) return renderEstMaterials(est);
+  const area=getSqm();
+  return `
+  <div class="infoBox"><strong>면적 ${fmt(area)}㎡ · 로스율 ${S.proj.lossRate}% · 소수점 올림</strong><br>견적서를 업로드하면 실제 자재내역이 연동됩니다.</div>
+  <div class="card" style="overflow-x:auto">
+    <div class="stitle">⚙️ 공정별 자재 산출</div>
+    ${S.processes.map((p,i)=>`
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-weight:700;font-size:13px">${esc(p.step)}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${area>0?`<span class="cbadge">${calcCans(p)}말</span>`:''}
+            ${S.processes.length>1?`<button class="btn btnD" style="padding:4px 8px;font-size:11px" data-action="delProc" data-val="${p.id}">✕</button>`:''}
+          </div>
+        </div>
+        <div class="fgrid2" style="gap:8px">
+          <div class="fgrp" style="margin:0"><label class="flbl">자재명</label><input class="finput" style="font-size:14px" data-procid="${p.id}" data-pf="mat" value="${esc(p.mat)}"></div>
+          <div class="fgrp" style="margin:0"><label class="flbl">규격(kg/말)</label><input type="number" class="finput" style="font-size:14px" data-procid="${p.id}" data-pf="can" value="${p.can}"></div>
+          <div class="fgrp" style="margin:0"><label class="flbl">도포량(kg/㎡)</label><input type="number" step="0.01" class="finput" style="font-size:14px" data-procid="${p.id}" data-pf="cov" value="${p.cov}"></div>
+          <div class="fgrp" style="margin:0"><label class="flbl">도포 횟수</label><input type="number" class="finput" style="font-size:14px" data-procid="${p.id}" data-pf="coats" value="${p.coats}"></div>
+          <div class="fgrp" style="grid-column:1/-1;margin:0"><label class="flbl">경화 시간</label><input class="finput" style="font-size:14px" data-procid="${p.id}" data-pf="dry" value="${esc(p.dry)}"></div>
+          <div class="fgrp" style="grid-column:1/-1;margin:0"><label class="flbl">⚠️ 주의사항</label><input class="finput" style="font-size:14px" data-procid="${p.id}" data-pf="note" value="${esc(p.note)}" placeholder="작업 주의사항..."></div>
+        </div>
+        ${area>0?`<div style="font-size:11px;color:var(--muted2);margin-top:8px">소요량: ${calcKg(p).toFixed(1)}kg</div>`:''}
+      </div>`).join('')}
+    <button class="btn btnG btnFull" data-action="addProc">＋ 공정 추가</button>
+    ${area>0?`<div style="text-align:right;font-size:18px;font-weight:900;color:var(--accent);margin-top:12px">총 발주: ${totalCans()}말</div>`:''}
+  </div>
+  <div class="card">
+    <div class="stitle">📸 필수 사진 체크리스트</div>
+    ${PHOTOS.map(ph=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted2);padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent);font-weight:700">☐</span>${esc(ph)}</div>`).join('')}
+  </div>`;
+}
+
+function renderEstMaterials(est){
+  const matTotal=est.mats.reduce((s,m)=>s+m.amount,0);
+  return `
+  <div class="greenBox">
+    <div class="gt">📄 견적서 자동 연동</div>
+    <strong style="color:var(--text)">${esc(est.info.method)}</strong> · ${fmt(est.info.areaSqm)}㎡ · ${fmtW(est.info.amount)}
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <div class="stitle">📦 자재 내역</div>
+    <div class="infoBox">수량 소수점 올림 처리 · 수량 0은 추가 가능 항목</div>
+    <table class="mtbl">
+      <thead><tr><th>구분</th><th>품목</th><th>단위</th><th>수량</th><th>금액</th></tr></thead>
+      <tbody>
+        <tr style="background:var(--surface)"><td colspan="5" style="padding:6px 8px;font-size:10px;font-weight:700;color:var(--muted2)">🧪 재료비 (${est.mats.length}항목)</td></tr>
+        ${est.mats.map(m=>`<tr style="${m.qty===0?'opacity:.4':''}"><td><span class="catbadge cmat">재료</span></td><td style="font-weight:700;font-size:12px">${esc(m.name)}${m.spec?`<div style="font-size:10px;color:var(--muted2)">${esc(m.spec)}</div>`:''}</td><td style="font-size:12px">${esc(m.unit)}</td><td><span class="qv">${m.qr}</span>${m.qty===0?'<div style="font-size:9px;color:var(--muted)">추가가능</div>':m.qty!==m.qr?`<div style="font-size:9px;color:var(--muted)">${m.qty}</div>`:''}</td><td style="font-size:12px;color:var(--muted2)">${m.amount>0?fmtW(m.amount):'-'}</td></tr>`).join('')}
+        <tr style="background:var(--adim)"><td colspan="4" style="text-align:right;font-weight:700;font-size:12px;padding:8px">재료비 합계</td><td style="font-size:14px;font-weight:900;color:var(--accent)">${fmtW(matTotal)}</td></tr>
+        ${est.labor.length?`<tr style="background:var(--surface)"><td colspan="5" style="padding:6px 8px;font-size:10px;font-weight:700;color:var(--muted2)">👷 인건비</td></tr>${est.labor.map(l=>`<tr><td><span class="catbadge clab">인건</span></td><td style="font-weight:700;font-size:12px">${esc(l.name)}</td><td style="font-size:12px">${esc(l.unit)}</td><td><span class="qv">${l.qty}</span></td><td style="font-size:12px;color:var(--muted2)">${fmtW(l.amount)}</td></tr>`).join('')`:''}
+        ${est.equip.length?`<tr style="background:var(--surface)"><td colspan="5" style="padding:6px 8px;font-size:10px;font-weight:700;color:var(--muted2)">🚛 장비대</td></tr>${est.equip.map(q=>`<tr><td><span class="catbadge ceqp">장비</span></td><td style="font-weight:700;font-size:12px">${esc(q.name)}</td><td style="font-size:12px">${esc(q.unit)}</td><td><span class="qv">${q.qty}</span></td><td style="font-size:12px;color:var(--muted2)">${fmtW(q.amount)}</td></tr>`).join('')`:''}
+      </tbody>
+    </table>
+    <div class="ttlrow"><span class="ttllbl">직접공사비 합계 (부가세 별도)</span><span class="ttlval">${fmtW(est.info.amount)}</span></div>
+  </div>
+  <div class="card">
+    <div class="stitle">⚙️ 공정 작업 메모</div>
+    ${S.processes.map(p=>`
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:14px">${esc(p.step)}</div>
+        <div class="fgrid2" style="gap:8px">
+          <div class="fgrp" style="margin:0"><label class="flbl">경화 시간</label><input class="finput" data-procid="${p.id}" data-pf="dry" value="${esc(p.dry)}"></div>
+          <div class="fgrp" style="grid-column:1/-1;margin:0"><label class="flbl">⚠️ 주의사항</label><input class="finput" data-procid="${p.id}" data-pf="note" value="${esc(p.note)}" placeholder="주의사항..."></div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function renderSend(){
+  const pw=getProjWorkers();
+  if(pw.length===0) return `
+    <div class="empty">
+      <div class="ico">👷</div>
+      <div class="emsg">배정된 작업자가 없습니다</div>
+      <div class="esub">「배정」탭에서 작업자를 선택하세요</div>
+      <button class="btn btnP" data-action="tab" data-val="workers">작업자 배정으로 이동 →</button>
+    </div>`;
+
+  const w=pw[S.wIdx]||pw[0];
+  const est=S.estData;
+  const matTotal=est?.mats?.reduce((s,m)=>s+m.amount,0)||0;
+  return `
+  <div class="stitle">👷 작업자 선택</div>
+  <div class="wtabs">
+    ${pw.map((worker,i)=>{const team=worker.teamId?getTeam(worker.teamId):null;return `<button class="wtab${S.wIdx===i?' on':''}" data-action="setWIdx" data-val="${i}">${esc(worker.name)}<span style="font-size:10px;opacity:.7;margin-left:4px">${esc(worker.role)}${team?` · ${esc(team.name)}`:''}</span></button>`;}).join('')}
+  </div>
+  <div class="card">
+    <div class="stitle">💬 카카오톡 전송용 <span class="ssub">${est?'견적서 기준':'자동계산'}</span></div>
+    <div class="kakao">${esc(genKakao(w))}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+      <button class="btn btnGr btnFull" style="font-size:15px" data-action="copyKakao" data-val="${S.wIdx}">📋 ${esc(w.name)} 지시서 복사 (카카오톡)</button>
+      ${pw.length>1?`<button class="btn btnG btnFull" data-action="copyAll">📋 전체 ${pw.length}명 한 번에 복사</button>`:''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="stitle">📦 자재 발주서 <span class="ssub">${est?'견적서 기준':`로스율 ${S.proj.lossRate}%`}</span></div>
+    ${est?`
+      <table class="mtbl"><thead><tr><th>품목명</th><th>단위</th><th>수량</th><th>금액</th></tr></thead>
+      <tbody>${est.mats.map(m=>`<tr style="${m.qty===0?'opacity:.4':''}"><td style="font-weight:700;font-size:12px">${esc(m.name)}</td><td style="font-size:12px">${esc(m.unit)}</td><td><span class="qv">${m.qr}</span></td><td style="font-size:12px;color:var(--muted2)">${m.amount>0?fmtW(m.amount):'-'}</td></tr>`).join('')}</tbody></table>
+      <div class="ttlrow"><span class="ttllbl">재료비 합계</span><span class="ttlval">${fmtW(matTotal)}</span></div>`
+    :getSqm()>0?`
+      <table class="mtbl"><thead><tr><th>공정</th><th>자재명</th><th>발주수량</th></tr></thead>
+      <tbody>${S.processes.map(p=>`<tr><td style="font-size:11px;color:var(--muted2)">${esc(p.step)}</td><td style="font-weight:700;font-size:12px">${esc(p.mat)}</td><td><span class="qv">${calcCans(p)}말</span></td></tr>`).join('')}</tbody></table>
+      <div class="ttlrow"><span class="ttllbl">총 발주</span><span class="ttlval">${totalCans()}말</span></div>`
+    :`<div style="color:var(--muted2);font-size:13px">프로젝트 탭에서 시공 면적을 입력하세요.</div>`}
+    <button class="btn btnG btnFull" style="margin-top:10px" data-action="copyOrder">📋 발주서 텍스트 복사</button>
+  </div>`;
+}
+
+// ─────────────────── MODAL ───────────────────
+function renderModal(){
+  const m=S.modal;
+  if(m.type==='worker'){
+    const f=m.form;
+    return `<div class="overlay" data-action="closeModal">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="mtitle">${m.data?'작업자 수정':'작업자 추가'}</div>
+        <div class="fgrp"><label class="flbl">이름 *</label><input class="finput" id="mf-name" value="${esc(f.name)}" placeholder="홍길동" autofocus></div>
+        <div class="fgrp"><label class="flbl">역할</label><select class="fsel" id="mf-role">${ROLES.map(r=>`<option${f.role===r?' selected':''}>${r}</option>`).join('')}</select></div>
+        <div class="fgrp"><label class="flbl">연락처</label><input class="finput" id="mf-contact" value="${esc(f.contact)}" placeholder="010-1234-5678"></div>
+        <div class="fgrp"><label class="flbl">소속 팀</label>
+          <select class="fsel" id="mf-teamId">
+            <option value="">팀 없음</option>
+            ${S.teams.map(t=>`<option value="${t.id}"${f.teamId===t.id?' selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fgrp"><label class="flbl">메모 (선택)</label><input class="finput" id="mf-memo" value="${esc(f.memo)}" placeholder="특기사항"></div>
+        <div class="mbtns">
+          <button class="btn btnG" style="flex:1" data-action="closeModal">취소</button>
+          <button class="btn btnP" style="flex:1" data-action="saveWorker">저장</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if(m.type==='team'){
+    const f=m.form;
+    return `<div class="overlay" data-action="closeModal">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="mtitle">${m.data?'팀 수정':'팀 추가'}</div>
+        <div class="fgrp"><label class="flbl">팀 이름 *</label><input class="finput" id="tf-name" value="${esc(f.name)}" placeholder="방수팀, 에폭시팀…" autofocus></div>
+        <div class="fgrp"><label class="flbl">팀 색상</label>
+          <div class="colors">
+            ${COLORS.map(c=>`<div class="copt" style="background:${c.hex};border-color:${f.colorId===c.id?'#fff':'transparent'};box-shadow:${f.colorId===c.id?'0 0 0 2px '+c.hex:'none'}" data-action="pickColor" data-val="${c.id}"></div>`).join('')}
+          </div>
+        </div>
+        <div class="mbtns">
+          <button class="btn btnG" style="flex:1" data-action="closeModal">취소</button>
+          <button class="btn btnP" style="flex:1" data-action="saveTeam">저장</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+// ─────────────────── RENDER ───────────────────
+function render(){
+  const el=document.getElementById('root');
+  el.innerHTML=renderApp();
+  bindEvents();
+}
+
+// ─────────────────── BIND EVENTS ───────────────────
+function bindEvents(){
+  // data-bind inputs (project form)
+  document.querySelectorAll('[data-bind]').forEach(el=>{
+    el.addEventListener('input',e=>{
+      const path=e.target.dataset.bind.split('.');
+      if(path[0]==='proj'){
+        S.proj[path[1]]=e.target.value;
+        // partial update for certain fields
+        if(path[1]==='area'||path[1]==='unit'){
+          const calcEl=document.querySelector('.fcalc');
+          if(calcEl&&S.proj.unit==='평'&&S.proj.area){
+            calcEl.textContent=`→ ${(parseFloat(S.proj.area)*3.3).toFixed(1)}㎡`;
+          }
+          if(path[1]==='unit') render();
+        }
+        if(path[1]==='method'){
+          S.processes=JSON.parse(JSON.stringify(PROC_TPL[e.target.value]||PROC_TPL['에폭시']));
+        }
+      }
+    });
+    el.addEventListener('change',e=>{
+      const path=e.target.dataset.bind.split('.');
+      if(path[0]==='proj') S.proj[path[1]]=e.target.value;
+      if(path[1]==='method') S.processes=JSON.parse(JSON.stringify(PROC_TPL[e.target.value]||PROC_TPL['에폭시']));
+    });
+  });
+
+  // Manual worker inputs
+  document.querySelectorAll('[data-manualid]').forEach(el=>{
+    el.addEventListener('input',e=>{
+      const id=e.target.dataset.manualid,field=e.target.dataset.field;
+      const w=S.manualWorkers.find(x=>x.id===id);
+      if(w){ w[field]=e.target.value; if(field==='name')render(); }
+    });
+    el.addEventListener('change',e=>{
+      const id=e.target.dataset.manualid,field=e.target.dataset.field;
+      const w=S.manualWorkers.find(x=>x.id===id);
+      if(w) w[field]=e.target.value;
+    });
+  });
+
+  // Process inputs
+  document.querySelectorAll('[data-procid]').forEach(el=>{
+    el.addEventListener('input',e=>{
+      const id=parseInt(e.target.dataset.procid)||e.target.dataset.procid;
+      const field=e.target.dataset.pf;
+      const p=S.processes.find(x=>x.id==id);
+      if(!p)return;
+      const num=['can','cov','coats'];
+      p[field]=num.includes(field)?(field==='coats'?parseInt(e.target.value)||1:parseFloat(e.target.value)||0):e.target.value;
+    });
+  });
+
+  // Click delegation
+  document.getElementById('root').addEventListener('click',e=>{
+    const el=e.target.closest('[data-action]');
+    if(!el)return;
+    const action=el.dataset.action,val=el.dataset.val;
+    handleAction(action,val,el);
+  });
+
+  // File input
+  document.getElementById('fileInp').onchange=handleFile;
+}
+
+// ─────────────────── ACTIONS ───────────────────
+function handleAction(action,val,el){
+  switch(action){
+    case 'tab': S.tab=val; S.wIdx=0; render(); break;
+    case 'setMode': S.assignMode=val; render(); break;
+    case 'setWIdx': S.wIdx=parseInt(val); render(); break;
+    case 'filterTeam': S.filterTeam=val; render(); break;
+    case 'toggleSel': S.selIds.has(val)?S.selIds.delete(val):S.selIds.add(val); render(); break;
+    case 'clearSel': S.selIds.clear(); render(); break;
+    case 'selectTeam': {
+      const ids=S.workerDB.filter(w=>w.teamId===val).map(w=>w.id);
+      ids.forEach(id=>S.selIds.add(id)); render(); break;
+    }
+    case 'clearEst': S.estData=null; render(); break;
+    case 'openFile': document.getElementById('fileInp').click(); break;
+
+    case 'addWorker': S.modal={type:'worker',data:null,form:{name:'',role:'현장 작업자',contact:'',teamId:'',memo:''}}; render(); break;
+    case 'editWorker': {
+      const w=S.workerDB.find(x=>x.id===val);
+      if(w) S.modal={type:'worker',data:w,form:{...w}}; render(); break;
+    }
+    case 'delWorker': if(confirm('삭제하시겠습니까?')){ S.workerDB=S.workerDB.filter(w=>w.id!==val); S.selIds.delete(val); saveWorkers(); render(); } break;
+    case 'saveWorker': {
+      const f={name:document.getElementById('mf-name')?.value||'',role:document.getElementById('mf-role')?.value||'현장 작업자',contact:document.getElementById('mf-contact')?.value||'',teamId:document.getElementById('mf-teamId')?.value||'',memo:document.getElementById('mf-memo')?.value||''};
+      if(!f.name.trim()){alert('이름을 입력하세요');return;}
+      if(S.modal.data){ S.workerDB=S.workerDB.map(w=>w.id===S.modal.data.id?{...w,...f}:w); showToast('✅ 수정 완료'); }
+      else { S.workerDB.push({...f,id:uid()}); showToast(`✅ ${f.name} 추가됨`); }
+      saveWorkers(); S.modal=null; render(); break;
+    }
+
+    case 'addTeam': S.modal={type:'team',data:null,form:{name:'',colorId:'c1'}}; render(); break;
+    case 'editTeam': {
+      const t=S.teams.find(x=>x.id===val);
+      if(t) S.modal={type:'team',data:t,form:{...t}}; render(); break;
+    }
+    case 'delTeam': if(confirm('팀을 삭제하시겠습니까?')){ S.teams=S.teams.filter(t=>t.id!==val); S.workerDB=S.workerDB.map(w=>w.teamId===val?{...w,teamId:''}:w); saveTeams(); saveWorkers(); render(); } break;
+    case 'saveTeam': {
+      const f={name:document.getElementById('tf-name')?.value||'',colorId:S.modal.form.colorId};
+      if(!f.name.trim()){alert('팀 이름을 입력하세요');return;}
+      if(S.modal.data){ S.teams=S.teams.map(t=>t.id===S.modal.data.id?{...t,...f}:t); }
+      else { S.teams.push({...f,id:uid()}); showToast(`✅ ${f.name} 팀 추가됨`); }
+      saveTeams(); S.modal=null; render(); break;
+    }
+    case 'pickColor': if(S.modal){S.modal.form.colorId=val;render();} break;
+    case 'closeModal': S.modal=null; render(); break;
+
+    case 'addManual': S.manualWorkers.push({id:uid(),name:'',role:'현장 작업자',contact:''}); render(); break;
+    case 'delManual': S.manualWorkers=S.manualWorkers.filter(w=>w.id!==val); render(); break;
+    case 'saveToPool': {
+      const w=S.manualWorkers.find(x=>x.id===val);
+      if(w&&w.name){ const nw={id:uid(),name:w.name,role:w.role,contact:w.contact,teamId:'',memo:''}; S.workerDB.push(nw); saveWorkers(); showToast(`✅ ${w.name} 인력풀에 저장됨`); render(); } break;
+    }
+
+    case 'addProc': S.processes.push({id:uid(),step:'추가 공정',mat:'',can:18,cov:.3,coats:1,dry:'24시간',note:''}); render(); break;
+    case 'delProc': S.processes=S.processes.filter(p=>String(p.id)!==String(val)); render(); break;
+
+    case 'copyKakao': {
+      const pw=getProjWorkers();
+      const w=pw[parseInt(val)]||pw[0];
+      if(w) copyText(genKakao(w));
+      break;
+    }
+    case 'copyAll': {
+      const pw=getProjWorkers();
+      const all=pw.map(w=>`${'='.repeat(22)}\n[ ${w.name} / ${w.role} ]\n${'='.repeat(22)}\n${genKakao(w)}`).join('\n\n');
+      copyText(all); break;
+    }
+    case 'copyOrder': {
+      const est=S.estData;
+      let txt=`📦 자재 발주서\n${'━'.repeat(20)}\n공사명: ${S.proj.name||est?.info?.name||'-'}\n`;
+      if(est){txt+=`공법: ${est.info.method}\n면적: ${fmt(est.info.areaSqm)}㎡\n${'━'.repeat(20)}\n`;txt+=est.mats.map(m=>`• ${m.name} | ${m.unit} | ${m.qr}${m.qty===0?' (추가가능)':''} → ${m.amount>0?fmtW(m.amount):'-'}`).join('\n');}
+      else{const area=getSqm();txt+=`면적: ${fmt(area)}㎡ / 로스율 ${S.proj.lossRate}%\n${'━'.repeat(20)}\n`;txt+=S.processes.map(p=>`• ${p.mat} (${p.can}kg/말): ${calcCans(p)}말`).join('\n')+`\n총 ${totalCans()}말`;}
+      copyText(txt); break;
+    }
+  }
+}
+
+function copyText(text){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>showToast('✅ 복사 완료! 카카오톡에 붙여넣기 하세요.')).catch(()=>fallbackCopy(text));
+  } else { fallbackCopy(text); }
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('✅ 복사 완료!');
+}
+
+// ─────────────────── FILE HANDLER ───────────────────
+function handleFile(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=evt=>{
+    try{
+      const wb=XLSX.read(evt.target.result,{type:'binary'});
+      if(wb.SheetNames.includes('갑지')){
+        const parsed=parseEst(wb);
+        S.estData=parsed;
+        const m=detMethod(parsed.info.method);
+        S.proj={...S.proj,name:parsed.info.name||S.proj.name,date:parsed.info.date||S.proj.date,area:parsed.info.areaSqm?String(parsed.info.areaSqm):S.proj.area,unit:'㎡',method:m};
+        S.processes=JSON.parse(JSON.stringify(PROC_TPL[m]||PROC_TPL['방수']));
+        showToast(`✅ 견적서 로드! 재료 ${parsed.mats.length}항목`);
+      } else {
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+        const dr=rows.slice(1).filter(r=>r&&r[0]);
+        if(dr.length>0){const r0=dr[0];S.proj={...S.proj,name:String(r0[0]||S.proj.name),address:String(r0[1]||S.proj.address),date:String(r0[2]||S.proj.date),method:String(r0[3]||S.proj.method),area:r0[4]?String(r0[4]):S.proj.area,unit:String(r0[5]||S.proj.unit)};}
+        S.estData=null;
+        showToast('✅ 현장데이터 로드 완료');
+      }
+      render();
+    }catch(err){showToast('❌ 엑셀 파싱 오류');}
+  };
+  reader.readAsBinaryString(file);
+  e.target.value='';
+}
+
+// ─────────────────── INIT ───────────────────
+loadDB();
+render();
+</script>
+</body>
+</html>
