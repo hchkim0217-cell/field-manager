@@ -275,86 +275,46 @@ function showToast(msg){
 }
 
 // ─────────────────── ESTIMATE PARSER ───────────────────
-function parseFilename(filename){
-  const name=filename.replace(/\.[^.]+$/,'');
-  const parts=name.split('_').map(p=>p.trim()).filter(Boolean);
-  const dateP=/^\d{6}$/,addrP=/[로길동구시군읍면가]/,numP=/^\d+-\d+$/;
-  let si=0;
-  if(parts[0]&&parts[0].length<=6&&/^[a-z]+$/i.test(parts[0]))si=1;
-  const mp=parts.slice(si).filter(p=>!dateP.test(p));
-  let building=mp[0]||'',addr=[],wt='',addrOn=false;
-  for(let i=1;i<mp.length;i++){
-    const p=mp[i];
-    if(addrP.test(p)){addrOn=true;addr.push(p);}
-    else if(numP.test(p)&&addrOn){addr.push(p);}
-    else if(addrOn){wt=mp.slice(i).join(' ');break;}
-  }
-  if(!addrOn)wt=mp.slice(1).join(' ');
-  return{buildingName:building,address:addr.join(' '),workType:wt,fullName:building+(wt?' '+wt:'')};
-}
-
-function parseEst(wb, filename) {
-  const info={name:'',date:'',amount:0,method:'',areaSqm:0,address:''};
+function parseEst(wb){
+  const info={name:'',date:'',amount:0,method:'',areaSqm:0};
   const mats=[],labor=[],equip=[];
-  if (filename) {
-    const pf=parseFilename(filename);
-    info.name=pf.fullName; info.address=pf.address;
-  }
   const g=wb.Sheets['갑지'];
-  if (g) {
+  if(g){
     const rows=XLSX.utils.sheet_to_json(g,{header:1,defval:null});
-    for (const row of rows) {
-      if (!row) continue;
-      for (let ci=0;ci<row.length;ci++) {
+    for(const row of rows){
+      if(!row)continue;
+      for(let ci=0;ci<row.length;ci++){
         const cell=String(row[ci]??'');
-        if (cell.includes('工 事 名')||cell.includes('工事名')) {
-          const ix=cell.indexOf(':');
-          if (ix>=0&&cell.slice(ix+1).trim()) info.name=cell.slice(ix+1).trim();
-          else for(let j=ci+1;j<Math.min(row.length,ci+8);j++){const v=String(row[j]??'').trim();if(v&&v.length>2){info.name=v;break;}}
-        }
-        const c0s=String(row[0]??'').replace(/\s/g,'');
-        if(c0s.includes('공사장소')||c0s.includes('工事場所')){for(let j=ci+1;j<Math.min(row.length,ci+8);j++){const v=String(row[j]??'').trim();if(v&&v.length>2){info.address=v;break;}}}
+        if(cell.includes('工 事 名')||cell.includes('工事名')){const i=cell.indexOf(':');if(i>=0)info.name=cell.slice(i+1).trim();}
         const dm=cell.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
         if(dm)info.date=`${dm[1]}-${dm[2].padStart(2,'0')}-${dm[3].padStart(2,'0')}`;
         if(typeof row[ci]==='number'&&row[ci]>100000&&String(row[0]??'').includes('금액'))info.amount=Math.max(info.amount,row[ci]);
       }
     }
   }
-  for(const shName of wb.SheetNames){
-    if(shName==='갑지'||shName.includes('수량'))continue;
-    const ws=wb.Sheets[shName];
+  for(const sh of wb.SheetNames){
+    if(sh==='갑지'||sh.includes('수량'))continue;
+    const ws=wb.Sheets[sh];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
     if(!rows.length)continue;
     if(rows[0]?.[0])info.method=String(rows[0][0]).replace(/^\d+-\d+안\.\s*/,'').trim();
     if(rows[1]){for(let ci=7;ci<(rows[1].length??0);ci++){if(typeof rows[1][ci]==='number'&&rows[1][ci]>10&&rows[1][ci]<100000){info.areaSqm=rows[1][ci];break;}}}
-    function getExecQty(ri){
-      try{
-        const ca=XLSX.utils.encode_cell({r:ri,c:3});
-        const cell=ws[ca];if(!cell)return null;
-        if(cell.f){
-          const m=cell.f.match(/(?:'([^']+)'|([^\s!+\-*/(),=<>]+))!([A-Z]+\d+)/);
-          if(m){const sn=(m[1]||m[2]||'').trim();const rws=wb.Sheets[sn];
-            if(rws&&m[3]){const p=XLSX.utils.decode_cell(m[3]);const ra=XLSX.utils.encode_cell({r:p.r,c:p.c+1});const rc=rws[ra];if(rc&&typeof rc.v==='number')return rc.v;}}
-        }
-        return typeof cell.v==='number'?cell.v:null;
-      }catch(e){return null;}
-    }
     const SKIP=['소    계','소계','합계','직접공사비','간접공사비','절사','부가가치세','총      계','총계'];
     let cat='재료비';
-    for(let ri=0;ri<rows.length;ri++){
-      const row=rows[ri];if(!row)continue;
+    for(const row of rows){
+      if(!row)continue;
       const c0=String(row[0]??'').trim();
       if(c0.includes('간접공사비')||c0.includes('2.간접'))break;
       if(c0.includes('(1)')&&c0.includes('재료비')){cat='재료비';continue;}
       if(c0.includes('(2)')&&c0.includes('인건비')){cat='인건비';continue;}
       if(c0.includes('(3)')){cat='장비대';continue;}
       if(SKIP.some(s=>c0.includes(s))||!c0)continue;
-      const unit=String(row[2]??'').trim(),qr=row[3],price=row[4],amount=row[5];
-      if(c0&&unit&&(typeof qr==='number'||ws[XLSX.utils.encode_cell({r:ri,c:3})]?.f)){
-        const execQty=getExecQty(ri);
-        const finalQty=execQty!==null?execQty:(typeof qr==='number'?qr:0);
-        const it={name:c0.trim(),spec:String(row[1]??'').trim(),unit,qty:finalQty,qtyDesign:typeof qr==='number'?qr:finalQty,qr:Math.ceil(finalQty),price:typeof price==='number'?price:0,amount:typeof amount==='number'?amount:0,notes:String(row[6]??'').trim()};
-        if(cat==='재료비')mats.push(it);else if(cat==='인건비')labor.push(it);else equip.push(it);
+      const unit=String(row[2]??'').trim(),qty=row[3],price=row[4],amount=row[5];
+      if(c0&&unit&&typeof qty==='number'){
+        const it={name:c0.trim(),spec:String(row[1]??'').trim(),unit,qty,qr:Math.ceil(qty),price:typeof price==='number'?price:0,amount:typeof amount==='number'?amount:0,notes:String(row[6]??'').trim()};
+        if(cat==='재료비')mats.push(it);
+        else if(cat==='인건비')labor.push(it);
+        else equip.push(it);
       }
     }
   }
@@ -852,7 +812,25 @@ function bindEvents(){
     const el=e.target.closest('[data-action]');
     if(!el)return;
     const action=el.dataset.action,val=el.dataset.val;
-    handleAction(action,val,el);
+    handleAction(action,val,el,e);
+  });
+
+  // 모달 입력값 실시간 저장 (한글 IME 문제 방지)
+  document.querySelectorAll('.modal .finput, .modal .fsel').forEach(inp => {
+    const updateModal = () => {
+      if (!S.modal) return;
+      const id = inp.id;
+      if (id === 'mf-name')    S.modal.form.name    = inp.value;
+      if (id === 'mf-role')    S.modal.form.role    = inp.value;
+      if (id === 'mf-contact') S.modal.form.contact = inp.value;
+      if (id === 'mf-teamId')  S.modal.form.teamId  = inp.value;
+      if (id === 'mf-memo')    S.modal.form.memo    = inp.value;
+      if (id === 'tf-name')    S.modal.form.name    = inp.value;
+    };
+    inp.addEventListener('input',  updateModal);
+    inp.addEventListener('change', updateModal);
+    inp.addEventListener('blur',   updateModal);
+    inp.addEventListener('compositionend', updateModal);
   });
 
   // File input
@@ -860,7 +838,7 @@ function bindEvents(){
 }
 
 // ─────────────────── ACTIONS ───────────────────
-function handleAction(action,val,el){
+function handleAction(action,val,el,e){
   switch(action){
     case 'tab': S.tab=val; S.wIdx=0; render(); break;
     case 'setMode': S.assignMode=val; render(); break;
@@ -882,8 +860,16 @@ function handleAction(action,val,el){
     }
     case 'delWorker': if(confirm('삭제하시겠습니까?')){ S.workerDB=S.workerDB.filter(w=>w.id!==val); S.selIds.delete(val); saveWorkers(); render(); } break;
     case 'saveWorker': {
-      const f={name:document.getElementById('mf-name')?.value||'',role:document.getElementById('mf-role')?.value||'현장 작업자',contact:document.getElementById('mf-contact')?.value||'',teamId:document.getElementById('mf-teamId')?.value||'',memo:document.getElementById('mf-memo')?.value||''};
-      if(!f.name.trim()){alert('이름을 입력하세요');return;}
+      // DOM + S.modal.form 둘 다 시도 (한글 IME 대응)
+      const domName = document.getElementById('mf-name')?.value||'';
+      const f={
+        name:    domName || S.modal.form.name    || '',
+        role:    document.getElementById('mf-role')?.value    || S.modal.form.role    || '현장 작업자',
+        contact: document.getElementById('mf-contact')?.value || S.modal.form.contact || '',
+        teamId:  document.getElementById('mf-teamId')?.value  || S.modal.form.teamId  || '',
+        memo:    document.getElementById('mf-memo')?.value    || S.modal.form.memo    || '',
+      };
+      if(!f.name.trim()){ showToast('⚠️ 이름을 입력하세요'); return; }
       if(S.modal.data){ S.workerDB=S.workerDB.map(w=>w.id===S.modal.data.id?{...w,...f}:w); showToast('✅ 수정 완료'); }
       else { S.workerDB.push({...f,id:uid()}); showToast(`✅ ${f.name} 추가됨`); }
       saveWorkers(); S.modal=null; render(); break;
@@ -896,14 +882,14 @@ function handleAction(action,val,el){
     }
     case 'delTeam': if(confirm('팀을 삭제하시겠습니까?')){ S.teams=S.teams.filter(t=>t.id!==val); S.workerDB=S.workerDB.map(w=>w.teamId===val?{...w,teamId:''}:w); saveTeams(); saveWorkers(); render(); } break;
     case 'saveTeam': {
-      const f={name:document.getElementById('tf-name')?.value||'',colorId:S.modal.form.colorId};
-      if(!f.name.trim()){alert('팀 이름을 입력하세요');return;}
+      const f={name:document.getElementById('tf-name')?.value||S.modal.form.name||'',colorId:S.modal.form.colorId};
+      if(!f.name.trim()){ showToast('⚠️ 팀 이름을 입력하세요'); return; }
       if(S.modal.data){ S.teams=S.teams.map(t=>t.id===S.modal.data.id?{...t,...f}:t); }
       else { S.teams.push({...f,id:uid()}); showToast(`✅ ${f.name} 팀 추가됨`); }
       saveTeams(); S.modal=null; render(); break;
     }
     case 'pickColor': if(S.modal){S.modal.form.colorId=val;render();} break;
-    case 'closeModal': if(!e.target.closest('.modal')){S.modal=null;render();} break;
+    case 'closeModal': if(el.tagName==='BUTTON'||!e||e.target===el){S.modal=null;render();} break;
 
     case 'addManual': S.manualWorkers.push({id:uid(),name:'',role:'현장 작업자',contact:''}); render(); break;
     case 'delManual': S.manualWorkers=S.manualWorkers.filter(w=>w.id!==val); render(); break;
@@ -951,14 +937,14 @@ function handleFile(e){
   const reader=new FileReader();
   reader.onload=evt=>{
     try{
-      const wb=XLSX.read(evt.target.result,{type:'binary',cellFormula:true,cellNF:false});
+      const wb=XLSX.read(evt.target.result,{type:'binary'});
       if(wb.SheetNames.includes('갑지')){
-        const parsed=parseEst(wb, file.name);
+        const parsed=parseEst(wb);
         S.estData=parsed;
         const m=detMethod(parsed.info.method);
-        S.proj={...S.proj,name:parsed.info.name||S.proj.name,address:parsed.info.address||S.proj.address,date:parsed.info.date||S.proj.date,area:parsed.info.areaSqm?String(parsed.info.areaSqm):S.proj.area,unit:'㎡',method:m};
+        S.proj={...S.proj,name:parsed.info.name||S.proj.name,date:parsed.info.date||S.proj.date,area:parsed.info.areaSqm?String(parsed.info.areaSqm):S.proj.area,unit:'㎡',method:m};
         S.processes=JSON.parse(JSON.stringify(PROC_TPL[m]||PROC_TPL['방수']));
-        showToast(`✅ 견적서 로드! 재료 ${parsed.mats.length}항목 · 주소: ${parsed.info.address||'없음'}`);
+        showToast(`✅ 견적서 로드! 재료 ${parsed.mats.length}항목`);
       } else {
         const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
         const dr=rows.slice(1).filter(r=>r&&r[0]);
