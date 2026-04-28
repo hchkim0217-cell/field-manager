@@ -275,46 +275,86 @@ function showToast(msg){
 }
 
 // ─────────────────── ESTIMATE PARSER ───────────────────
-function parseEst(wb){
-  const info={name:'',date:'',amount:0,method:'',areaSqm:0};
+function parseFilename(filename){
+  const name=filename.replace(/\.[^.]+$/,'');
+  const parts=name.split('_').map(p=>p.trim()).filter(Boolean);
+  const dateP=/^\d{6}$/,addrP=/[로길동구시군읍면가]/,numP=/^\d+-\d+$/;
+  let si=0;
+  if(parts[0]&&parts[0].length<=6&&/^[a-z]+$/i.test(parts[0]))si=1;
+  const mp=parts.slice(si).filter(p=>!dateP.test(p));
+  let building=mp[0]||'',addr=[],wt='',addrOn=false;
+  for(let i=1;i<mp.length;i++){
+    const p=mp[i];
+    if(addrP.test(p)){addrOn=true;addr.push(p);}
+    else if(numP.test(p)&&addrOn){addr.push(p);}
+    else if(addrOn){wt=mp.slice(i).join(' ');break;}
+  }
+  if(!addrOn)wt=mp.slice(1).join(' ');
+  return{buildingName:building,address:addr.join(' '),workType:wt,fullName:building+(wt?' '+wt:'')};
+}
+
+function parseEst(wb, filename) {
+  const info={name:'',date:'',amount:0,method:'',areaSqm:0,address:''};
   const mats=[],labor=[],equip=[];
+  if (filename) {
+    const pf=parseFilename(filename);
+    info.name=pf.fullName; info.address=pf.address;
+  }
   const g=wb.Sheets['갑지'];
-  if(g){
+  if (g) {
     const rows=XLSX.utils.sheet_to_json(g,{header:1,defval:null});
-    for(const row of rows){
-      if(!row)continue;
-      for(let ci=0;ci<row.length;ci++){
+    for (const row of rows) {
+      if (!row) continue;
+      for (let ci=0;ci<row.length;ci++) {
         const cell=String(row[ci]??'');
-        if(cell.includes('工 事 名')||cell.includes('工事名')){const i=cell.indexOf(':');if(i>=0)info.name=cell.slice(i+1).trim();}
+        if (cell.includes('工 事 名')||cell.includes('工事名')) {
+          const ix=cell.indexOf(':');
+          if (ix>=0&&cell.slice(ix+1).trim()) info.name=cell.slice(ix+1).trim();
+          else for(let j=ci+1;j<Math.min(row.length,ci+8);j++){const v=String(row[j]??'').trim();if(v&&v.length>2){info.name=v;break;}}
+        }
+        const c0s=String(row[0]??'').replace(/\s/g,'');
+        if(c0s.includes('공사장소')||c0s.includes('工事場所')){for(let j=ci+1;j<Math.min(row.length,ci+8);j++){const v=String(row[j]??'').trim();if(v&&v.length>2){info.address=v;break;}}}
         const dm=cell.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
         if(dm)info.date=`${dm[1]}-${dm[2].padStart(2,'0')}-${dm[3].padStart(2,'0')}`;
         if(typeof row[ci]==='number'&&row[ci]>100000&&String(row[0]??'').includes('금액'))info.amount=Math.max(info.amount,row[ci]);
       }
     }
   }
-  for(const sh of wb.SheetNames){
-    if(sh==='갑지'||sh.includes('수량'))continue;
-    const ws=wb.Sheets[sh];
+  for(const shName of wb.SheetNames){
+    if(shName==='갑지'||shName.includes('수량'))continue;
+    const ws=wb.Sheets[shName];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
     if(!rows.length)continue;
     if(rows[0]?.[0])info.method=String(rows[0][0]).replace(/^\d+-\d+안\.\s*/,'').trim();
     if(rows[1]){for(let ci=7;ci<(rows[1].length??0);ci++){if(typeof rows[1][ci]==='number'&&rows[1][ci]>10&&rows[1][ci]<100000){info.areaSqm=rows[1][ci];break;}}}
+    function getExecQty(ri){
+      try{
+        const ca=XLSX.utils.encode_cell({r:ri,c:3});
+        const cell=ws[ca];if(!cell)return null;
+        if(cell.f){
+          const m=cell.f.match(/(?:'([^']+)'|([^\s!+\-*/(),=<>]+))!([A-Z]+\d+)/);
+          if(m){const sn=(m[1]||m[2]||'').trim();const rws=wb.Sheets[sn];
+            if(rws&&m[3]){const p=XLSX.utils.decode_cell(m[3]);const ra=XLSX.utils.encode_cell({r:p.r,c:p.c+1});const rc=rws[ra];if(rc&&typeof rc.v==='number')return rc.v;}}
+        }
+        return typeof cell.v==='number'?cell.v:null;
+      }catch(e){return null;}
+    }
     const SKIP=['소    계','소계','합계','직접공사비','간접공사비','절사','부가가치세','총      계','총계'];
     let cat='재료비';
-    for(const row of rows){
-      if(!row)continue;
+    for(let ri=0;ri<rows.length;ri++){
+      const row=rows[ri];if(!row)continue;
       const c0=String(row[0]??'').trim();
       if(c0.includes('간접공사비')||c0.includes('2.간접'))break;
       if(c0.includes('(1)')&&c0.includes('재료비')){cat='재료비';continue;}
       if(c0.includes('(2)')&&c0.includes('인건비')){cat='인건비';continue;}
       if(c0.includes('(3)')){cat='장비대';continue;}
       if(SKIP.some(s=>c0.includes(s))||!c0)continue;
-      const unit=String(row[2]??'').trim(),qty=row[3],price=row[4],amount=row[5];
-      if(c0&&unit&&typeof qty==='number'){
-        const it={name:c0.trim(),spec:String(row[1]??'').trim(),unit,qty,qr:Math.ceil(qty),price:typeof price==='number'?price:0,amount:typeof amount==='number'?amount:0,notes:String(row[6]??'').trim()};
-        if(cat==='재료비')mats.push(it);
-        else if(cat==='인건비')labor.push(it);
-        else equip.push(it);
+      const unit=String(row[2]??'').trim(),qr=row[3],price=row[4],amount=row[5];
+      if(c0&&unit&&(typeof qr==='number'||ws[XLSX.utils.encode_cell({r:ri,c:3})]?.f)){
+        const execQty=getExecQty(ri);
+        const finalQty=execQty!==null?execQty:(typeof qr==='number'?qr:0);
+        const it={name:c0.trim(),spec:String(row[1]??'').trim(),unit,qty:finalQty,qtyDesign:typeof qr==='number'?qr:finalQty,qr:Math.ceil(finalQty),price:typeof price==='number'?price:0,amount:typeof amount==='number'?amount:0,notes:String(row[6]??'').trim()};
+        if(cat==='재료비')mats.push(it);else if(cat==='인건비')labor.push(it);else equip.push(it);
       }
     }
   }
@@ -706,7 +746,7 @@ function renderModal(){
   if(m.type==='worker'){
     const f=m.form;
     return `<div class="overlay" data-action="closeModal">
-      <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal">
         <div class="mtitle">${m.data?'작업자 수정':'작업자 추가'}</div>
         <div class="fgrp"><label class="flbl">이름 *</label><input class="finput" id="mf-name" value="${esc(f.name)}" placeholder="홍길동" autofocus></div>
         <div class="fgrp"><label class="flbl">역할</label><select class="fsel" id="mf-role">${ROLES.map(r=>`<option${f.role===r?' selected':''}>${r}</option>`).join('')}</select></div>
@@ -728,7 +768,7 @@ function renderModal(){
   if(m.type==='team'){
     const f=m.form;
     return `<div class="overlay" data-action="closeModal">
-      <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal">
         <div class="mtitle">${m.data?'팀 수정':'팀 추가'}</div>
         <div class="fgrp"><label class="flbl">팀 이름 *</label><input class="finput" id="tf-name" value="${esc(f.name)}" placeholder="방수팀, 에폭시팀…" autofocus></div>
         <div class="fgrp"><label class="flbl">팀 색상</label>
@@ -863,7 +903,7 @@ function handleAction(action,val,el){
       saveTeams(); S.modal=null; render(); break;
     }
     case 'pickColor': if(S.modal){S.modal.form.colorId=val;render();} break;
-    case 'closeModal': S.modal=null; render(); break;
+    case 'closeModal': if(!e.target.closest('.modal')){S.modal=null;render();} break;
 
     case 'addManual': S.manualWorkers.push({id:uid(),name:'',role:'현장 작업자',contact:''}); render(); break;
     case 'delManual': S.manualWorkers=S.manualWorkers.filter(w=>w.id!==val); render(); break;
@@ -911,14 +951,14 @@ function handleFile(e){
   const reader=new FileReader();
   reader.onload=evt=>{
     try{
-      const wb=XLSX.read(evt.target.result,{type:'binary'});
+      const wb=XLSX.read(evt.target.result,{type:'binary',cellFormula:true,cellNF:false});
       if(wb.SheetNames.includes('갑지')){
-        const parsed=parseEst(wb);
+        const parsed=parseEst(wb, file.name);
         S.estData=parsed;
         const m=detMethod(parsed.info.method);
-        S.proj={...S.proj,name:parsed.info.name||S.proj.name,date:parsed.info.date||S.proj.date,area:parsed.info.areaSqm?String(parsed.info.areaSqm):S.proj.area,unit:'㎡',method:m};
+        S.proj={...S.proj,name:parsed.info.name||S.proj.name,address:parsed.info.address||S.proj.address,date:parsed.info.date||S.proj.date,area:parsed.info.areaSqm?String(parsed.info.areaSqm):S.proj.area,unit:'㎡',method:m};
         S.processes=JSON.parse(JSON.stringify(PROC_TPL[m]||PROC_TPL['방수']));
-        showToast(`✅ 견적서 로드! 재료 ${parsed.mats.length}항목`);
+        showToast(`✅ 견적서 로드! 재료 ${parsed.mats.length}항목 · 주소: ${parsed.info.address||'없음'}`);
       } else {
         const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
         const dr=rows.slice(1).filter(r=>r&&r[0]);
